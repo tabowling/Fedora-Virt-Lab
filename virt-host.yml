@@ -1,0 +1,119 @@
+- hosts: all
+
+#  remote_user: root
+#  remote_user: demo
+
+#  ansible_become: yes
+#  ansible_become_method: sudo
+#  ansible_become_user: root
+#  ansible_become_password: "{{ demo_password }}
+
+# Assumes roles from galaxy
+#   Fedora: yum install -y ansible linux-system-roles
+#
+#   ansible-galaxy install linux-system-roles.firewall
+#   ansible-galaxy install linux-system-roles.cockpit
+#   ansible-galaxy install linux-system-roles.image_builder
+
+  vars:
+    USE_FIREWALL: 1
+    CONFIG_STORAGE: 1
+    VIRT_LAB_PKGS:
+      - ansible
+      - python3
+      - linux-system-roles
+      - cowsay
+      - libvirt
+      - libvirt-daemon
+      - libvirt-client
+      - qemu-img
+      - virt-install
+      - virt-manager
+      - virt-manager-common
+      - virt-top
+      - virt-viewer
+      - virt-what
+      - libguestfs-tools
+
+
+  tasks:
+
+    - name: Install libvirt host packages
+      package:
+        name: "{{ VIRT_LAB_PKGS }}"
+        state: present  # or use latest
+
+#    - name: Set alternatives to python3
+#      alternatives:
+#        name: python
+#        link: /usr/bin/python3
+#        path: /usr/bin/python3.8
+
+
+    # Optional example to configure 
+    - name: Configure storage for VirtualMachines
+      include_role:
+        name: linux-system-roles.storage
+      vars:
+        use_partitions: false
+        storage_pools:
+          - name: extData
+            disks: ['sdb']  # something like vdb or sdb
+            # type: lvm
+            state: present
+            volumes:
+              - name: VirtualMachines
+                size: "1T"
+                # type: lvm
+                # fs_type: xfs
+                fs_label: "vms"
+                mount_point: '/VirtualMachines'
+                mount_options: 'defaults,noatime,nodiratime,nofail,x-systemd.device-timeout=3s'
+      when: CONFIG_STORAGE|bool
+
+
+    - name: set libvirt selinux contexts
+      include_role:
+        name: linux-system-roles.selinux
+      vars:
+        selinux_policy: targeted   # Yes, Everybody loves SELINUX!!!
+        selinux_state: enforcing
+        selinux_fcontexts:
+          - { target: '/VirtualMachines(/.*)?', setype: 'virt_image_t', ftype: 'd', state: 'present' }
+        selinux_restore_dirs:
+          - '/VirtualMachines' 
+      when: CONFIG_STORAGE|bool
+
+
+    - name: Enable libvirtd
+      service:
+        name: libvirtd
+        enabled: yes
+        state: started
+
+
+    - name: Install RHEL/Fedora Web Console (Cockpit)
+      include_role:
+        name: linux-system-roles.cockpit
+      vars:
+        cockpit_packages: "full"   # or minimial or default
+
+
+    - name: Configure Firewall for Web Console
+      include_role:
+        name: linux-system-roles.firewall
+      vars:
+        firewall:
+          service: cockpit
+          state: enabled
+      when: USE_FIREWALL|bool
+
+
+    - name: Install and enable RHEL/Fedora Image Builder service
+      include_role:
+        name: linux-system-roles.image_builder
+      vars:
+        ib_packages: "full"   # or "minimal" or "default"
+
+
+

@@ -1,0 +1,45 @@
+name = "Fed_Min"
+description = "A minimal image containing only @core and a few packages"
+version = "0.0.4"
+modules = []
+groups = []
+
+[[packages]]
+name = "ansible"
+version = "*"
+
+[[packages]]
+name = "cockpit"
+version = "*"
+
+[customizations]
+hostname = "Golden-Image"
+
+[[customizations.user]]
+description = "demo"
+groups = ["wheel", "weldr", "libvirt"]
+key = "PUBLIC SSH KEY"
+name = "admin"
+
+[[customizations.sshkey]]
+user = "root"
+key = "PUBLIC SSH KEY"
+
+
+[customizations.timezone]
+timezone = "US/Eastern"
+ntpservers = ["1.fedora.pool.ntp.org", "2.fedora.pool.ntp.org"]
+
+[customizations.locale]
+languages = ["en_US.UTF-8"]
+keyboard = "us"
+
+[customizations.firewall]
+ports = ["99999:tcp"]
+
+[customizations.firewall.services]
+enabled = ["cockpit"]
+
+[customizations.services]
+enabled = ["sshd", "cockpit.socket"]
+disabled = ["httpd"]
